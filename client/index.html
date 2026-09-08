@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f5f7" />
+    <meta
+      name="description"
+      content="The KK Factor — news, live radio and music in one place. Read the day's stories, tune into the live stream and play the library without switching apps."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>The KK Factor — News, Live Radio &amp; Music</title>
+
+    <script>
+      /*
+        Applies the stored colour scheme before the first paint. Without this
+        the page renders light for a frame and then flips, which reads as a
+        flash. ThemeProvider runs the same logic once React mounts.
+      */
+      (function () {
+        try {
+          var stored = localStorage.getItem('kk_theme');
+          var mode = ['light', 'dark', 'system'].indexOf(stored) >= 0 ? stored : 'system';
+          var dark =
+            mode === 'dark' ||
+            (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#141419');
+          }
+        } catch (e) {
+          /* storage blocked — fall back to the light default */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

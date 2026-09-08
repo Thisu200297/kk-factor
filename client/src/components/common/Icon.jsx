@@ -1,0 +1,171 @@
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Ban,
+  Bell,
+  CheckCircle2,
+  CheckSquare,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Circle,
+  Clock,
+  Newspaper,
+  Disc3,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  FileAudio,
+  Headphones,
+  Home,
+  Image as ImageIcon,
+  ImageOff,
+  ImagePlus,
+  Info,
+  LayoutDashboard,
+  LibraryBig,
+  ListMusic,
+  ListPlus,
+  ListVideo,
+  Contrast,
+  Lock,
+  LogIn,
+  LogOut,
+  Mail,
+  Menu,
+  Moon,
+  Music2,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  Radio,
+  RefreshCw,
+  Repeat,
+  Repeat1,
+  Search,
+  Send,
+  Settings2,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  Square,
+  Sun,
+  Tag,
+  Trash2,
+  TrendingUp,
+  TriangleAlert,
+  Upload,
+  UserPlus,
+  Users,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Wifi,
+  X,
+  Zap,
+} from 'lucide-react';
+import { classNames } from '../../utils/format';
+
+/**
+ * Central icon registry.
+ *
+ * Keys are the Material Symbols names the components were written against, so
+ * call sites read the same as the original design system. The glyphs come from
+ * lucide-react, which is bundled with the app — the icon set therefore has no
+ * runtime CDN dependency and renders correctly offline, behind a strict CSP,
+ * or if fonts.googleapis.com is unreachable.
+ */
+const ICONS = {
+  add: Plus,
+  add_photo_alternate: ImagePlus,
+  arrow_back: ArrowLeft,
+  arrow_downward: ArrowDown,
+  arrow_upward: ArrowUp,
+  article: Newspaper,
+  audio_file: FileAudio,
+  block: Ban,
+  bolt: Zap,
+  broken_image: ImageOff,
+  check_box: CheckSquare,
+  check_box_outline_blank: Square,
+  check_circle: CheckCircle2,
+  chevron_left: ChevronLeft,
+  chevron_right: ChevronRight,
+  close: X,
+  dashboard: LayoutDashboard,
+  delete: Trash2,
+  edit: Pencil,
+  email: Mail,
+  error: TriangleAlert,
+  group: Users,
+  headphones: Headphones,
+  home: Home,
+  image: ImageIcon,
+  inbox: Bell,
+  info: Info,
+  keyboard_arrow_down: ChevronDown,
+  keyboard_arrow_up: ChevronUp,
+  label: Tag,
+  library_music: LibraryBig,
+  login: LogIn,
+  logout: LogOut,
+  menu: Menu,
+  music_note: Music2,
+  network_check: Wifi,
+  newspaper: Newspaper,
+  open_in_new: ExternalLink,
+  password: Lock,
+  pause: Pause,
+  person_add: UserPlus,
+  play_arrow: Play,
+  playlist_add: ListPlus,
+  playlist_play: ListVideo,
+  publish: Send,
+  queue_music: ListMusic,
+  radio: Radio,
+  refresh: RefreshCw,
+  repeat: Repeat,
+  repeat_one: Repeat1,
+  contrast: Contrast,
+  dark_mode: Moon,
+  light_mode: Sun,
+  circle: Circle,
+  schedule: Clock,
+  search: Search,
+  settings: Settings2,
+  shuffle: Shuffle,
+  skip_next: SkipForward,
+  skip_previous: SkipBack,
+  trending_up: TrendingUp,
+  upload: Upload,
+  visibility: Eye,
+  visibility_off: EyeOff,
+  volume_down: Volume1,
+  volume_mute: Volume1,
+  volume_off: VolumeX,
+  volume_up: Volume2,
+};
+
+/** Rendered when a name is not in the registry, so a typo is obvious in dev. */
+const FALLBACK = Disc3;
+
+export default function Icon({ name, filled = false, className = '', size = 24, ...rest }) {
+  const Glyph = ICONS[name] || FALLBACK;
+
+  return (
+    <Glyph
+      aria-hidden="true"
+      focusable="false"
+      size={size}
+      strokeWidth={filled ? 2.4 : 1.9}
+      // `filled` approximates the Material Symbols FILL axis: solid transport
+      // controls (play/pause) read better than outlines at small sizes.
+      fill={filled ? 'currentColor' : 'none'}
+      className={classNames('shrink-0', className)}
+      {...rest}
+    />
+  );
+}
