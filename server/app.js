@@ -115,23 +115,57 @@ app.use(
  * Found by loading the production build in a browser; curl never reproduces it,
  * because curl does not send an Origin header.
  */
-const apiCors = cors({
-  origin(origin, callback) {
-    // Same-origin / curl / server-to-server requests carry no Origin header.
-    if (!origin) return callback(null, true);
-    if (config.frontendOrigins.includes(origin)) return callback(null, true);
-    // A plain Error here would surface as a 500 "Internal server error",
-    // which sends developers hunting for a bug that does not exist. An
-    // ApiError gives them a 403 that names the actual problem.
-    return callback(
-      ApiError.forbidden(
-        `Origin ${origin} is not in the CORS allow-list. ` +
-          `Add it to FRONTEND_URL in server/.env (comma-separated for several origins).`,
-      ),
-    );
-  },
+const CORS_BASE = {
   credentials: true, // required for the httpOnly refresh cookie
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
+
+/**
+ * The allow-list is checked against the host the request actually arrived on,
+ * not only against configured origins.
+ *
+ * A browser sends an Origin header on every POST, PUT, PATCH and DELETE —
+ * including the ones the site makes to its own server. So on a single-origin
+ * deployment, signing in still arrives carrying
+ * `Origin: https://the-site.example`, meets an allow-list that only knows
+ * about localhost, and is refused. The site rejects its own login form, and
+ * the error tells you to edit a file on a machine that is not the one
+ * serving the page.
+ *
+ * Comparing Origin to the request's own scheme and host settles it without
+ * configuration: same origin is allowed because it is the same origin, on
+ * whatever URL the service happens to be deployed under. FRONTEND_URL is then
+ * only for genuinely separate front ends — a Vite dev server, or a staging
+ * site on another domain.
+ *
+ * (Behind Render's proxy the TLS terminates upstream, so the scheme comes
+ * from x-forwarded-proto — which `trust proxy` above makes req.protocol
+ * report correctly.)
+ */
+const apiCors = cors((req, callback) => {
+  const origin = req.headers.origin;
+
+  // curl, server-to-server, and same-origin GETs carry no Origin at all.
+  if (!origin) return callback(null, { ...CORS_BASE, origin: true });
+
+  const host = req.headers.host;
+  if (host && origin === `${req.protocol}://${host}`) {
+    return callback(null, { ...CORS_BASE, origin: true });
+  }
+
+  if (config.frontendOrigins.includes(origin)) {
+    return callback(null, { ...CORS_BASE, origin: true });
+  }
+
+  // A plain Error here would surface as a 500 "Internal server error",
+  // which sends developers hunting for a bug that does not exist. An
+  // ApiError gives them a 403 that names the actual problem.
+  return callback(
+    ApiError.forbidden(
+      `Origin ${origin} is not allowed. It is neither this server's own ` +
+        `origin nor in FRONTEND_URL (comma-separated for several origins).`,
+    ),
+  );
 });
 
 /* --- Parsers and general middleware -------------------------------------- */

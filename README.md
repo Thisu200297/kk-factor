@@ -137,10 +137,11 @@ id is stripped from the response before it leaves the API.
 npm test
 ```
 
-42 tests, no database, under a second. They cover the places this project has
+47 tests, no database, under two seconds. They cover the places this project has
 actually had bugs: slug collisions, HTML entities in imported headlines, the six
-shapes a YouTube link arrives in, pagination clamping, and the fact that a
-refresh token can never be presented as an access token.
+shapes a YouTube link arrives in, pagination clamping, the fact that a refresh
+token can never be presented as an access token, and the site being allowed to
+call its own API.
 
 ---
 
