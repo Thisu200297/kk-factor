@@ -87,6 +87,10 @@ the repository, so your database password is **not** uploaded to GitHub.
 | Start Command | `npm start` |
 | Instance Type | **Free** |
 
+> **Do not add `NODE_VERSION`.** `server/.node-version` already pins Node to 22.
+> Left to itself Render installs the newest release that satisfies `engines`, and
+> a brand-new major is not where you want to find out your dependencies disagree.
+
 4. Open **Advanced** → **Add Environment Variable**, and add these:
 
 | Key | Value |
@@ -196,6 +200,8 @@ and sends the reader to their site. If they agree in writing, set
 | What you see | Cause | Fix |
 | --- | --- | --- |
 | Build fails on Render | Root Directory not set to `server` | Settings → Root Directory → `server` |
+| `sh: 1: vite: not found` | Render sets `NODE_ENV=production`, and npm then skips devDependencies — which is where `vite` lives | Already fixed: the build script installs the client with `--include=dev`. If you ever rewrite it, keep that flag. |
+| Something breaks only on Render, never locally | Render picks the newest Node that satisfies `engines`, which can be a version released last week | `server/.node-version` pins it to 22. Change that file, not `engines`, to move versions. |
 | Site loads but no news or episodes | The feeds have never run | Dashboard → The show → **Refresh from YouTube**, and check the Step 6 cron job |
 | Site loads but nothing at all | `MONGODB_URI` wrong, or Atlas is not allowing Render | Re-check Step 1 and the `/kk_factor` part of the string |
 | `querySrv EREFUSED` in the logs | DNS cannot resolve the `+srv` address | Rare on Render. Use the long `mongodb://` form from `server/.env` instead |
