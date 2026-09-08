@@ -59,6 +59,20 @@ app.use(
   helmet({
     // Audio and cover art are consumed cross-origin by the client dev server.
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    /**
+     * Helmet's default is `no-referrer`, and that breaks the embedded show.
+     *
+     * YouTube decides whether a video may play in a frame by looking at the
+     * Referer header and checking the domain against the video's embedding
+     * settings. With no referrer at all it cannot make that check and refuses
+     * with a bare "Video player configuration error - Error 153" on a black
+     * rectangle, which looks for all the world like a broken video id.
+     *
+     * `strict-origin-when-cross-origin` is what browsers themselves default
+     * to: the origin only (never the path) to another https site, and nothing
+     * at all when the destination downgrades to http.
+     */
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     contentSecurityPolicy: config.isProd
       ? {
           directives: {

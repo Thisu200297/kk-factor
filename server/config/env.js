@@ -9,6 +9,26 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
+/**
+ * The cloudinary SDK parses CLOUDINARY_URL at require() time and throws if the
+ * string is not a `cloudinary://` URL. That throw happens while modules are
+ * still loading, so a value with the `CLOUDINARY_URL=` prefix accidentally
+ * pasted in front of it takes the entire service down in a crash loop, with an
+ * error from inside somebody else's library and no clue which setting is wrong.
+ *
+ * Uploads are a feature; the site is not. So a malformed value is reported
+ * plainly and dropped, and uploads fall back to local disk.
+ */
+if (process.env.CLOUDINARY_URL && !/^cloudinary:\/\//.test(process.env.CLOUDINARY_URL.trim())) {
+  // eslint-disable-next-line no-console
+  console.error(
+    '[config] CLOUDINARY_URL is ignored: it must begin with "cloudinary://".\n' +
+      '[config] Paste only the URL itself - no "CLOUDINARY_URL=" in front, and no <angle brackets>.\n' +
+      '[config] Uploads will be written to local disk, which a free host erases on every restart.'
+  );
+  delete process.env.CLOUDINARY_URL;
+}
+
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isTest = NODE_ENV === 'test';
 const isProd = NODE_ENV === 'production';
