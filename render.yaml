@@ -1,0 +1,72 @@
+# Render blueprint for The KK Factor.
+#
+# One web service serves both the API and the built React app, so the whole
+# site lives on a single origin: no CORS to configure, and the refresh cookie
+# is never a third-party cookie (which Safari blocks by default).
+#
+# Secrets are deliberately NOT in this file. MONGODB_URI, CLOUDINARY_URL and
+# PUBLIC_SITE_URL are marked sync:false, so Render asks for them in the
+# dashboard and stores them encrypted instead of in git.
+services:
+  - type: web
+    name: the-kk-factor
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # --- Database --------------------------------------------------------
+      # Use the mongodb+srv:// form here. Render's DNS resolves SRV records
+      # fine, and that form keeps working if Atlas ever moves the cluster.
+      # It must name the database: ...mongodb.net/kk_factor?retryWrites=true
+      - key: MONGODB_URI
+        sync: false
+
+      # --- Auth ------------------------------------------------------------
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # --- Uploads ---------------------------------------------------------
+      # Without this, a logo or photo an editor uploads is erased every time
+      # the free instance restarts or wakes from its idle spin-down. The
+      # sponsor logos that shipped with the repo survive regardless: they are
+      # served from server/seed-assets/partners.
+      - key: CLOUDINARY_URL
+        sync: false
+
+      # --- Community news (Greek City Times) --------------------------------
+      - key: NEWS_FEED_URL
+        value: https://greekcitytimes.com/feed/
+      - key: NEWS_SOURCE_NAME
+        value: Greek City Times
+      # Keep false until Greek City Times give written permission to publish
+      # their full articles. false = headline, photo, excerpt and a link back.
+      - key: NEWS_FULL_TEXT
+        value: "false"
+
+      # --- The show (YouTube) ----------------------------------------------
+      # The channel's public Atom feed. No API key, no quota.
+      - key: YOUTUBE_CHANNEL_ID
+        value: UC2g-gkU4Hwc3tGd3hkv5E1Q
+
+      # --- Feed refresh -----------------------------------------------------
+      # The in-process timer only runs while the service is awake, and a free
+      # instance sleeps after 15 idle minutes. So an outside scheduler must
+      # call POST /api/import/run with this secret in an x-import-secret
+      # header. Copy the generated value out of the Render dashboard.
+      - key: IMPORT_INTERVAL_MINUTES
+        value: "30"
+      - key: IMPORT_SECRET
+        generateValue: true
+
+      # Used in the ready-made "we are live" social post.
+      # e.g. https://the-kk-factor.onrender.com
+      - key: PUBLIC_SITE_URL
+        sync: false

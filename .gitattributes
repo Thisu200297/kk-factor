@@ -1,0 +1,23 @@
+# The project is written on Windows and runs on Linux, so line endings are
+# normalised to LF in the repository and checked out however the machine
+# prefers. Without this, every file looks rewritten the first time somebody
+# clones it on the other platform.
+* text=auto eol=lf
+
+# Windows launchers must keep CRLF or cmd.exe mis-reads them.
+*.bat text eol=crlf
+
+# Binary, never diffed or converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.docx binary
+*.pdf binary
+
+# Lockfiles are generated; keep them out of code review diffs.
+package-lock.json -diff linguist-generated

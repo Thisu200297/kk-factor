@@ -1,0 +1,71 @@
+{
+  "name": "kk-factor-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The KK Factor \u2014 REST API for the unified news / live radio / music platform",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "db:indexes": "node scripts/syncIndexes.js",
+    "db:seed": "node scripts/seed.js",
+    "feeds:refresh": "node scripts/refreshFeeds.js",
+    "setup": "npm install && npm run db:seed",
+    "test": "cross-env NODE_ENV=test jest --runInBand --forceExit",
+    "test:watch": "cross-env NODE_ENV=test jest --runInBand --watch",
+    "test:coverage": "cross-env NODE_ENV=test jest --runInBand --coverage --forceExit",
+    "build": "npm install --prefix ../client && npm run build --prefix ../client",
+    "db:partners": "node scripts/seedPartners.js"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "disablePostinstall": "1"
+    }
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.1",
+    "compression": "^1.7.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "express-validator": "^7.2.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.9.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.0",
+    "rss-parser": "^3.13.0",
+    "sanitize-html": "^2.13.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.4",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "collectCoverageFrom": [
+      "controllers/**/*.js",
+      "middleware/**/*.js",
+      "utils/**/*.js"
+    ],
+    "testTimeout": 30000
+  },
+  "overrides": {
+    "htmlparser2": "^9.1.0"
+  }
+}
