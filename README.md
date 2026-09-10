@@ -18,6 +18,7 @@ never a third-party cookie (which Safari blocks by default).
 | **Community news** | Greek City Times, read from their WordPress API — the lead photo, the author, and the sections they filed it under. Held as a teaser and linked back, or in full where they have given permission. |
 | **The show** | A live banner while she is on air, and an episode archive that fills itself from the YouTube channel feed. |
 | **Going live** | One switch turns the banner on and writes the social post she pastes into Facebook, Instagram, TikTok and LinkedIn. |
+| **The weekly slot** | Tuesdays 7.30–9.30pm, counted down on the site and offered as a calendar entry. Edited from the dashboard, day and time and zone. |
 | **Music** | Her own playlist, uploaded as files, with a player that survives navigation. |
 | **Gallery** | Photos and video from events. Video is a YouTube link rather than a file. |
 | **Membership** | Normal and Premium listeners. An episode can be marked for members; the lock is enforced on the server. |
@@ -103,6 +104,20 @@ the channel's public Atom feed. No API key, no quota, and nobody uploads
 anything. The feed carries no duration, which is why that one field is typed in
 by hand.
 
+**The schedule is a wall-clock time, not an instant.** "Tuesdays at 7.30pm"
+means 7.30pm in Melbourne, which is 09:30 UTC for half the year and 08:30 for
+the other half. Storing the weekday, the time and the zone and resolving them
+per request is what keeps the show at 7.30 across the daylight-saving change
+instead of drifting an hour; the browser is only ever handed an instant to
+count down to, so nothing on the client has to reason about somebody else's
+daylight saving. `utils/schedule.js` does it with `Intl` and no dependency.
+
+**Reminders are a calendar entry, not a subscription.** A `.ics` file and a
+Google Calendar link work on every phone and desktop, survive the reader
+clearing their browser, and ask for nothing — no permission prompt, no email
+address, no record of the reader here. Browser push would reach fewer people:
+Apple only allows it once a site has been added to the home screen.
+
 **Going live is a switch, not a detector.** Asking YouTube whether a channel is
 on air needs the Data API, and polling it would spend the whole daily quota
 answering a question the presenter already knows — she is pressing "go live" on
@@ -153,12 +168,13 @@ id is stripped from the response before it leaves the API.
 npm test
 ```
 
-73 tests, no database, under two seconds. They cover the places this project has
+94 tests, no database, under two seconds. They cover the places this project has
 actually had bugs: slug collisions, HTML entities in imported headlines, the six
 shapes a YouTube link arrives in, pagination clamping, the fact that a refresh
 token can never be presented as an access token, the site being allowed to call
-its own API, and the syndication trailer that — with the obvious regex — ate
-every article containing the words "appeared first on".
+its own API, the syndication trailer that — with the obvious regex — ate every
+article containing the words "appeared first on", and both nights a year when
+Melbourne's clocks move.
 
 ---
 

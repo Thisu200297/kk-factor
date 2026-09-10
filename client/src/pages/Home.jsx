@@ -3,6 +3,7 @@ import SponsorStrip from '../components/Sponsors/SponsorStrip';
 import OrganisationsPanel from '../components/Sponsors/OrganisationsPanel';
 import LiveBanner from '../components/Show/LiveBanner';
 import ShowSection from '../components/Show/ShowSection';
+import NextShow from '../components/Show/NextShow';
 import CommunityNews from '../components/News/CommunityNews';
 import Icon from '../components/common/Icon';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -122,6 +123,10 @@ export default function Home() {
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="container-page">
+        <NextShow className="mb-8" />
       </div>
 
       <ShowSection limit={4} />

@@ -1,6 +1,8 @@
 const { Setting } = require('../models');
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 const { sanitizePlain } = require('../utils/sanitize');
+const { describeSchedule, parseTime, DEFAULT_SCHEDULE } = require('../utils/schedule');
 
 /**
  * The "we are live" banner, and the ready-made social post that goes with it.
@@ -20,6 +22,7 @@ const { sanitizePlain } = require('../utils/sanitize');
  */
 
 const LIVE_KEY = 'live';
+const SCHEDULE_KEY = 'show.schedule';
 const EMPTY = { isLive: false, title: null, videoId: null, videoUrl: null, startedAt: null };
 
 const YT_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -61,10 +64,73 @@ function composePost(state, siteUrl) {
   return lines.join('\n');
 }
 
-/** GET /api/show/live — public; the banner reads this. */
+/**
+ * GET /api/show/live — public; the banner and the countdown both read this.
+ *
+ * The schedule comes back resolved to absolute instants rather than as
+ * "Tuesday 7.30pm". The browser then counts down to a timestamp, which it can
+ * do, instead of reasoning about Melbourne's daylight saving from Athens or
+ * Toronto, which it cannot — and neither can the server unless it is careful,
+ * which is what utils/schedule.js is for.
+ */
 const getLive = asyncHandler(async (_req, res) => {
-  const state = (await Setting.read(LIVE_KEY)) || EMPTY;
-  return res.json({ success: true, data: { live: state } });
+  const [state, storedSchedule] = await Promise.all([
+    Setting.read(LIVE_KEY),
+    Setting.read(SCHEDULE_KEY),
+  ]);
+
+  return res.json({
+    success: true,
+    data: {
+      live: state || EMPTY,
+      schedule: describeSchedule(storedSchedule),
+    },
+  });
+});
+
+/**
+ * PUT /api/show/schedule (admin)
+ *
+ * The slot is a weekday and a wall-clock time in a named zone, never an
+ * instant — that is what keeps the show at 7.30pm on both sides of the
+ * daylight-saving change instead of drifting to 8.30 for half the year.
+ */
+const setSchedule = asyncHandler(async (req, res) => {
+  const body = req.body || {};
+
+  const startTime = body.startTime ?? DEFAULT_SCHEDULE.startTime;
+  const endTime = body.endTime ?? DEFAULT_SCHEDULE.endTime;
+
+  if (!parseTime(startTime) || !parseTime(endTime)) {
+    throw ApiError.badRequest('Start and end must be 24-hour times, like 19:30.');
+  }
+
+  const weekday = Number(body.weekday ?? DEFAULT_SCHEDULE.weekday);
+  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
+    throw ApiError.badRequest('Weekday must be 0 (Sunday) to 6 (Saturday).');
+  }
+
+  const timezone = String(body.timezone || DEFAULT_SCHEDULE.timezone);
+  try {
+    // Rejects a typo here rather than at render time in somebody's browser.
+    new Intl.DateTimeFormat('en', { timeZone: timezone });
+  } catch {
+    throw ApiError.badRequest(`"${timezone}" is not a time zone name.`);
+  }
+
+  const schedule = {
+    enabled: body.enabled === undefined ? true : Boolean(body.enabled),
+    weekday,
+    startTime,
+    endTime,
+    timezone,
+    title: sanitizePlain(body.title) || DEFAULT_SCHEDULE.title,
+    note: sanitizePlain(body.note) || DEFAULT_SCHEDULE.note,
+  };
+
+  await Setting.write(SCHEDULE_KEY, schedule, { isPublic: true });
+
+  return res.json({ success: true, data: { schedule: describeSchedule(schedule) } });
 });
 
 /**
@@ -94,4 +160,4 @@ const setLive = asyncHandler(async (req, res) => {
   return res.json({ success: true, data: { live: state, post: composePost(state, siteUrl) } });
 });
 
-module.exports = { getLive, setLive, toVideoId, composePost, LIVE_KEY };
+module.exports = { getLive, setLive, setSchedule, toVideoId, composePost, LIVE_KEY, SCHEDULE_KEY };

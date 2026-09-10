@@ -16,4 +16,11 @@ router.get('/live', ctrl.getLive);
 /** Admin: the "Go live" switch, which also returns the post to paste. */
 router.put('/live', writeLimiter, requireAuth, requireAdmin, liveRules, validate, ctrl.setLive);
 
+/**
+ * Admin: the weekly slot. Validated in the controller rather than by
+ * express-validator, because "is this a real IANA zone name" is a question
+ * only Intl can answer.
+ */
+router.put('/schedule', writeLimiter, requireAuth, requireAdmin, ctrl.setSchedule);
+
 module.exports = router;

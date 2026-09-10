@@ -255,8 +255,10 @@ export const mediaApi = {
 };
 
 export const showApi = {
+  /** The live banner and the weekly slot, in one small read. */
   getLive: () => unwrap(api.get('/show/live')),
   setLive: (payload) => unwrap(api.put('/show/live', payload)),
+  setSchedule: (payload) => unwrap(api.put('/show/schedule', payload)),
 };
 
 export const importApi = {

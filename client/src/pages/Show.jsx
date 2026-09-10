@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Icon from '../components/common/Icon';
 import { Player } from '../components/Show/ShowSection';
+import NextShow from '../components/Show/NextShow';
 import { ListSkeleton } from '../components/common/Loader';
 import { EmptyState, ErrorState } from '../components/common/States';
 import { useFetch } from '../hooks/useFetch';
@@ -49,6 +50,8 @@ export default function Show() {
           Live on YouTube from the RPP FM 98.7 studio, and kept here afterwards. Every episode
           appears on this page by itself once the stream ends.
         </p>
+
+        <NextShow className="mt-6 max-w-2xl" />
       </header>
 
       {current.loading ? (

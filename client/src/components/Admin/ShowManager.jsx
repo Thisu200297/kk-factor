@@ -39,8 +39,169 @@ export default function ShowManager() {
     <section className="space-y-6">
       <h2 className="text-headline-md font-bold">The show</h2>
       <GoLive state={live.data?.live} loading={live.loading} onChanged={live.refetch} toast={toast} />
+      <Schedule state={live.data?.schedule} onChanged={live.refetch} toast={toast} />
       <Archive query={episodes} toast={toast} />
     </section>
+  );
+}
+
+/* --------------------------------------------------------------- schedule -- */
+
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
+
+/**
+ * The weekly slot, which is what the countdown on the site counts down to.
+ *
+ * Stored as a weekday and a wall-clock time in a named zone rather than as a
+ * moment. That is what keeps the show at 7.30pm on both sides of the
+ * daylight-saving change, instead of quietly becoming 8.30 for half the year.
+ */
+function Schedule({ state, onChanged, toast }) {
+  const [form, setForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!state) return;
+    setForm({
+      enabled: state.enabled !== false,
+      weekday: Number(state.weekday ?? 2),
+      startTime: state.startTime || '19:30',
+      endTime: state.endTime || '21:30',
+      timezone: state.timezone || 'Australia/Melbourne',
+      title: state.title || '',
+      note: state.note || '',
+    });
+  }, [state]);
+
+  if (!form) return <div className="card p-5"><ListSkeleton rows={3} /></div>;
+
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+
+  const onSave = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      await showApi.setSchedule(form);
+      toast.success('Schedule saved');
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const next = state?.next;
+
+  return (
+    <div className="card p-5 md:p-6">
+      <header className="mb-4 flex flex-wrap items-center gap-3">
+        <h3 className="text-headline-sm">When the show is on</h3>
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(event) => set({ enabled: event.target.checked })}
+          />
+          Show this on the site
+        </label>
+      </header>
+
+      <p className="mb-5 text-sm text-fg-muted">
+        The site counts down to this and offers listeners a calendar entry. Times are in the zone
+        below, so the show stays at the same hour when the clocks change.
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label className="label" htmlFor="sched-day">Day</label>
+          <select
+            id="sched-day" className="input" value={form.weekday}
+            onChange={(event) => set({ weekday: Number(event.target.value) })}
+          >
+            {WEEKDAY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="sched-start">Starts</label>
+          <input
+            id="sched-start" type="time" className="input" value={form.startTime}
+            onChange={(event) => set({ startTime: event.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="sched-end">Ends</label>
+          <input
+            id="sched-end" type="time" className="input" value={form.endTime}
+            onChange={(event) => set({ endTime: event.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="sched-tz">Time zone</label>
+          <input
+            id="sched-tz" className="input" value={form.timezone}
+            onChange={(event) => set({ timezone: event.target.value })}
+            placeholder="Australia/Melbourne"
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="sched-title">Name of the show</label>
+          <input
+            id="sched-title" className="input" value={form.title}
+            onChange={(event) => set({ title: event.target.value })}
+            placeholder="The Greek Eurobeat Show"
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="sched-note">One line underneath</label>
+          <input
+            id="sched-note" className="input" value={form.note}
+            onChange={(event) => set({ note: event.target.value })}
+            placeholder="Live on RPP FM 98.7 / 98.3 and on YouTube"
+          />
+        </div>
+      </div>
+
+      <InlineError message={error} />
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary" onClick={onSave} disabled={busy}>
+          {busy ? <Spinner size={16} /> : <Icon name="save" size={17} />}
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+
+        {next && (
+          <p className="text-sm text-fg-muted">
+            Next:{' '}
+            <strong className="text-fg">
+              {new Intl.DateTimeFormat('en-AU', {
+                timeZone: form.timezone,
+                weekday: 'long', day: 'numeric', month: 'short',
+                hour: 'numeric', minute: '2-digit',
+              }).format(new Date(next.startsAt))}
+            </strong>
+            {state?.abbreviation && <> {state.abbreviation}</>}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
