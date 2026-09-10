@@ -15,7 +15,7 @@ never a third-party cookie (which Safari blocks by default).
 | --- | --- |
 | **Sponsors** | A strip across the top of every page, managed from the dashboard: add, remove, reorder, upload a logo, and count clicks. A sponsor with no website shows a phone number and email instead. |
 | **Organisations** | The same records with `kind: organisation` — a sidebar of the bodies Roula supports. |
-| **Community news** | The three newest stories from Greek City Times, pulled from their RSS feed and linked back to them. |
+| **Community news** | Greek City Times, read from their WordPress API — the lead photo, the author, and the sections they filed it under. Held as a teaser and linked back, or in full where they have given permission. |
 | **The show** | A live banner while she is on air, and an episode archive that fills itself from the YouTube channel feed. |
 | **Going live** | One switch turns the banner on and writes the social post she pastes into Facebook, Instagram, TikTok and LinkedIn. |
 | **Music** | Her own playlist, uploaded as files, with a player that survives navigation. |
@@ -59,7 +59,8 @@ sees one origin in development too.
 | `npm test` | The test suite — no database needed, runs in under a second |
 | `npm run db:seed` | Admin account, categories, radio placeholders. Add `-- --demo-articles` for sample stories. |
 | `npm run db:partners` | Sponsors and organisations |
-| `npm run feeds:refresh` | Pull the news feed and the episode archive once |
+| `npm run feeds:refresh` | Pull the news and the episode archive once |
+| `npm run news:categories` | List the publisher's sections with story counts, and suggest a set |
 | `npm run build` | Installs and builds the client into `client/dist` |
 
 ---
@@ -112,11 +113,26 @@ unaudited app publishes private, Instagram needs a business account and Meta's
 app review, and LinkedIn does not open personal-profile posting to ordinary
 developers. So the site writes the post and she pastes it.
 
-**Imported news links out.** Headline, photo and a short excerpt are stored and
-the reader is sent to the publisher. Their feed does carry the full article, but
-a feed exposing text is not a licence to republish it — `NEWS_FULL_TEXT` turns
-that on if permission is ever given, with no code change. The feed carries no
-images at all, so the importer falls back to each article's `og:image`.
+**News comes from the publisher's API, and falls back to their feed.** A
+WordPress site already offers `/wp-json/wp/v2/posts` with no key and no quota,
+and it is better than RSS in every way that matters here: the lead photo as a
+real URL rather than a page to scrape for an `og:image`, the sections a story
+was filed under, the author's name, and a hundred posts a page going back years
+instead of the latest fifteen. The RSS reader is kept for the day that API is
+turned off. Both sources identify a story by the same `?p=<id>`, so switching
+between them updates what is already stored rather than duplicating it — and
+the API import is about five times faster, because it fetches no article pages.
+
+**Whether the whole article is stored is a legal switch, not a technical one.**
+Both sources hand the body over freely; that is not a licence to republish it.
+`NEWS_FULL_TEXT` is off until the publisher has agreed in writing. With it on,
+imported stories open here — with the byline, the credit above the article, the
+credit below it, and a `rel=canonical` pointing at the original, because two
+copies of an article on the web without one costs the publisher their ranking.
+With it off they open on the publisher's site, and the client decides which by
+reading `is_full_text` off the record rather than by knowing anything about
+configuration. Permission for the text is not permission for the photographs;
+that is worth settling separately.
 
 **`seed-assets/` survives a wiped disk.** A free host's filesystem is erased on
 every restart while the database keeps pointing at `/uploads/...`. The sponsor
@@ -137,11 +153,12 @@ id is stripped from the response before it leaves the API.
 npm test
 ```
 
-47 tests, no database, under two seconds. They cover the places this project has
+73 tests, no database, under two seconds. They cover the places this project has
 actually had bugs: slug collisions, HTML entities in imported headlines, the six
 shapes a YouTube link arrives in, pagination clamping, the fact that a refresh
-token can never be presented as an access token, and the site being allowed to
-call its own API.
+token can never be presented as an access token, the site being allowed to call
+its own API, and the syndication trailer that — with the obvious regex — ate
+every article containing the words "appeared first on".
 
 ---
 

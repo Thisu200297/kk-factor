@@ -96,7 +96,9 @@ function NewsRow({ article }) {
         </span>
         <span className="mt-1 flex items-center gap-1 text-[0.6875rem] text-fg-subtle">
           {article.category?.name} · {formatRelative(article.published_at)}
-          {article.is_external && <Icon name="open_in_new" size={11} className="opacity-70" />}
+          {article.is_external && !article.is_full_text && (
+            <Icon name="open_in_new" size={11} className="opacity-70" />
+          )}
         </span>
       </span>
     </>
@@ -108,7 +110,7 @@ function NewsRow({ article }) {
    * An imported story opens at the publisher; anything written here opens here.
    * The rule lives in the data, so nothing has to change when both exist.
    */
-  if (article.is_external && article.source_url) {
+  if (article.is_external && article.source_url && !article.is_full_text) {
     return (
       <a href={article.source_url} target="_blank" rel="noopener noreferrer" className={className}>
         {body}

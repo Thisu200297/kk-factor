@@ -3,45 +3,113 @@ const { Article, Category, User } = require('../models');
 const { slugify, uniqueSlug } = require('../utils/slugify');
 const { sanitizeRichText, sanitizePlain } = require('../utils/sanitize');
 const { fetchFeed, firstImage, ogImage, toPlainText } = require('./feeds');
+const wpApi = require('./wpApi');
 
 /**
- * Imports the Greek City Times feed.
+ * Imports the Greek City Times newsroom.
  *
- * TWO MODES, and the difference is legal rather than technical.
+ * TWO SOURCES, AND THE BETTER ONE IS PREFERRED
  *
- *   linkOut (the default) stores the headline, the photo and the feed's own
- *   short excerpt, and sends the reader to greekcitytimes.com to finish it.
- *   That is ordinary aggregation and needs no permission.
+ *   The WordPress API at /wp-json/wp/v2/posts is used when it answers. It
+ *   carries the lead photo as a real URL, the sections the story was filed
+ *   under, the author, the modification time, and up to a hundred posts a
+ *   page going back years.
  *
- *   fullText stores the whole article body, which the WordPress feed does hand
- *   over in <content:encoded>. A feed exposing the text is NOT a licence to
- *   republish it, so this mode stays off until Greek City Times have agreed in
- *   writing. Flip NEWS_FULL_TEXT in server/.env once they have.
+ *   The RSS feed is the fallback, for when that API is turned off or the
+ *   publisher changes. It carries the fifteen most recent stories, no
+ *   pictures whatsoever and no sections, so the importer has to fetch each
+ *   article page for its og:image and file everything under one heading.
+ *
+ * Both identify a story the same way — WordPress writes `?p=<id>` into both
+ * the feed's <guid> and the API's guid.rendered — so the two sources agree
+ * about what is already stored, and switching between them duplicates
+ * nothing.
+ *
+ * TWO MODES, AND THE DIFFERENCE IS LEGAL RATHER THAN TECHNICAL
+ *
+ *   linkOut stores the headline, the photo and a short excerpt, and sends the
+ *   reader to greekcitytimes.com to finish it. That is ordinary aggregation
+ *   and needs nobody's permission.
+ *
+ *   fullText stores the whole article body. Both sources hand the body over
+ *   freely, and that is not a licence to republish it, so this stays off
+ *   until the publisher has agreed in writing. NEWS_FULL_TEXT is the switch.
+ *
+ * Note that permission to republish an article's *text* is not automatically
+ * permission to republish its *photographs*: newsrooms routinely run agency
+ * pictures they license for their own site alone. Worth settling separately.
  */
 
-/** Their section names on the left, ours on the right. */
+/**
+ * Their sections on the left, ours on the right.
+ *
+ * Greek City Times files under a hundred categories. These are the ones that
+ * actually carry volume, mapped onto the handful of headings this site has.
+ * Anything unrecognised falls through to Greek News.
+ */
 const CATEGORY_MAP = {
+  // Greece itself
   'greek news': 'Greek News',
-  politics: 'Politics',
-  world: 'Politics',
-  sport: 'Sports',
-  sports: 'Sports',
+  greece: 'Greek News',
+  'current affairs': 'Greek News',
+  'latest news': 'Greek News',
+  politics: 'Greek News',
+  religion: 'Greek News',
+  orthodoxy: 'Greek News',
+  history: 'Greek News',
+  community: 'Greek News',
+
+  'ancient greece': 'Greek News',
+  archaeology: 'Greek News',
+  cyprus: 'Greek News',
+
+  // The diaspora, which is who this station broadcasts to
+  'greek australian news': 'Greek Australian',
+  'greek australian': 'Greek Australian',
+  australia: 'Greek Australian',
+  diaspora: 'Greek Australian',
+  melbourne: 'Greek Australian',
+  sydney: 'Greek Australian',
+
+  // Culture and the lighter end
+  'greek culture': 'Entertainment',
+  'greek lifestyle': 'Entertainment',
+  lifestyle: 'Entertainment',
   entertainment: 'Entertainment',
   culture: 'Entertainment',
   music: 'Entertainment',
+  arts: 'Entertainment',
+  art: 'Entertainment',
   food: 'Entertainment',
+  film: 'Entertainment',
+  people: 'Entertainment',
+  society: 'Entertainment',
+  celebrity: 'Entertainment',
+  events: 'Entertainment',
   travel: 'Entertainment',
-  religion: 'Greek News',
-  orthodoxy: 'Greek News',
-  community: 'Greek News',
+  'travel news': 'Entertainment',
+  'greece travel': 'Entertainment',
+
+  sport: 'Sports',
+  sports: 'Sports',
+
+  // Wire copy about everywhere else
+  'world news': 'Politics',
+  world: 'Politics',
+  turkey: 'Politics',
+  usa: 'Politics',
+  uk: 'Politics',
+  eu: 'Politics',
   business: 'Politics',
+  finance: 'Politics',
+
   technology: 'Tech',
   tech: 'Tech',
 };
 
 const FALLBACK_CATEGORY = 'Greek News';
 
-/** Space out the page requests that fill in missing photos. */
+/** Space out the page requests the RSS path makes to fill in missing photos. */
 const OG_LOOKUP_GAP_MS = 400;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,8 +128,8 @@ async function ensureCategory(name, cache) {
 }
 
 /** Picks our category from whatever sections the publisher tagged the item with. */
-function mapCategory(feedCategories = []) {
-  for (const raw of feedCategories) {
+function mapCategory(sourceCategories = []) {
+  for (const raw of sourceCategories) {
     const hit = CATEGORY_MAP[String(raw).trim().toLowerCase()];
     if (hit) return hit;
   }
@@ -69,39 +137,142 @@ function mapCategory(feedCategories = []) {
 }
 
 /**
- * The article body we are willing to store.
+ * WordPress appends "The post ... appeared first on ..." to every excerpt it
+ * syndicates. We render our own attribution and link, so it is noise.
  *
- * In linkOut mode this is deliberately short: their excerpt, with the
- * "The post ... appeared first on ..." trailer WordPress appends stripped out,
- * since we render our own attribution and link.
+ * Only the final paragraph is considered, and only if it does not span any
+ * other paragraph. The obvious pattern —
+ *
+ *     /<p>\s*The post[\s\S]*?appeared first on[\s\S]*?<\/p>\s*$/
+ *
+ * — looks equivalent and is not: anchored to the end of the string, it starts
+ * at the FIRST paragraph beginning "The post" and runs to the LAST `</p>` in
+ * the document. An article whose own prose happens to contain that phrase
+ * loses everything from there to the end. Harmless while we only stored a
+ * two-line excerpt; not harmless now that full articles are stored.
  */
-function bodyFor(item, fullText) {
-  if (fullText && item.contentEncoded) return sanitizeRichText(item.contentEncoded);
+function stripSyndicationTrailer(html) {
+  const source = String(html || '');
 
-  const excerpt = String(item.contentSnippet || item.content || item.description || '');
-  const trimmed = excerpt.replace(/<p>\s*The post[\s\S]*?appeared first on[\s\S]*?<\/p>\s*$/i, '');
-  return sanitizeRichText(trimmed || excerpt);
+  const lastParagraph = /<p\b[^>]*>((?:(?!<\/?p\b)[\s\S])*)<\/p>\s*$/i.exec(source);
+  if (!lastParagraph) return source;
+
+  if (!/The post[\s\S]*appeared first on/i.test(lastParagraph[1])) return source;
+
+  return source.slice(0, lastParagraph.index);
+}
+
+/** The article body we are willing to store, given the permission we have. */
+function bodyFor(item, fullText) {
+  if (fullText && item.html) return sanitizeRichText(item.html);
+  const excerpt = stripSyndicationTrailer(item.excerptHtml || item.html || '');
+  return sanitizeRichText(excerpt || item.excerptHtml || '');
+}
+
+/* ------------------------------------------------------------------------ *
+ * Reading the two sources into one shape
+ * ------------------------------------------------------------------------ */
+
+/** An RSS item, in the shape wpApi.normalise produces. */
+function fromFeedItem(item) {
+  return {
+    guid: String(item.guid || item.id || item.link || '').trim(),
+    postId: null,
+    title: item.title || '',
+    link: item.link || '',
+    html: item.contentEncoded || item.content || '',
+    excerptHtml: String(item.contentSnippet || item.content || item.description || ''),
+    image: firstImage(item.contentEncoded) || firstImage(item.content) || null,
+    author: item.creator || null,
+    categories: item.categories || [],
+    publishedAt: item.isoDate ? new Date(item.isoDate) : null,
+    modifiedAt: null,
+  };
 }
 
 /**
- * Runs one import pass. Idempotent: an item already stored under its feed guid
- * is updated in place rather than inserted again, so this can run as often as
- * you like without ever duplicating a story.
+ * Collects the stories to import, from the API where possible.
+ *
+ * `pages` is what makes a back catalogue possible: one page is the routine
+ * refresh, ten is a one-off backfill of a thousand articles. It only applies
+ * to the API — RSS has exactly one page and that is the whole of it.
  */
-async function importNews({ limit = 30 } = {}) {
-  const { feedUrl, sourceName, fullText } = config.news;
+async function loadItems({ perPage, pages, categoryIds }) {
+  const apiRoot = config.news.apiUrl || wpApi.apiRootFrom(config.news.feedUrl);
 
-  if (!feedUrl) {
-    return { skipped: true, reason: 'NEWS_FEED_URL is not set', imported: 0, updated: 0 };
+  if (config.news.useApi && apiRoot) {
+    try {
+      const collected = [];
+      for (let page = 1; page <= Math.max(1, pages); page += 1) {
+        const batch = await wpApi.fetchPosts({
+          apiRoot,
+          perPage,
+          page,
+          categories: categoryIds,
+        });
+        collected.push(...batch);
+        if (batch.length < perPage) break; // ran off the end
+      }
+      return { items: collected, via: 'api', apiRoot };
+    } catch (error) {
+      // Not fatal. The feed is still there, and a newsroom that has switched
+      // its API off should not take the news panel down with it.
+      // eslint-disable-next-line no-console
+      console.warn(`[news] API unavailable (${error.message}); falling back to RSS`);
+    }
   }
+
+  if (!config.news.feedUrl) return { items: [], via: 'none', apiRoot };
+
+  const feed = await fetchFeed(config.news.feedUrl);
+  return {
+    items: (feed.items || []).slice(0, perPage).map(fromFeedItem),
+    via: 'rss',
+    feedTitle: feed.title,
+    apiRoot,
+  };
+}
+
+/* ------------------------------------------------------------------------ *
+ * The import
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Runs one import pass. Idempotent: a story already stored under its guid is
+ * updated in place rather than inserted again, so this can run as often as
+ * you like and a correction the publisher makes reaches the site too.
+ */
+async function importNews({ limit, pages, categoryIds } = {}) {
+  const { sourceName, fullText } = config.news;
+
+  const perPage = limit || config.news.perPage;
+  const wantPages = pages || config.news.pages;
+  const wantCategories = categoryIds || config.news.categoryIds;
 
   const author = await User.findOne({ role: 'admin' }).sort({ created_at: 1 });
   if (!author) {
-    return { skipped: true, reason: 'No admin account to attribute imports to', imported: 0, updated: 0 };
+    return {
+      skipped: true,
+      reason: 'No admin account to attribute imports to',
+      imported: 0,
+      updated: 0,
+    };
   }
 
-  const feed = await fetchFeed(feedUrl);
-  const items = (feed.items || []).slice(0, limit);
+  const { items, via, feedTitle } = await loadItems({
+    perPage,
+    pages: wantPages,
+    categoryIds: wantCategories,
+  });
+
+  if (via === 'none') {
+    return {
+      skipped: true,
+      reason: 'Neither NEWS_API_URL nor NEWS_FEED_URL is set',
+      imported: 0,
+      updated: 0,
+    };
+  }
 
   const cache = new Map();
   let imported = 0;
@@ -111,21 +282,20 @@ async function importNews({ limit = 30 } = {}) {
 
   for (const item of items) {
     try {
-      const guid = String(item.guid || item.id || item.link || '').trim();
-      if (!guid || !item.title || !item.link) continue;
+      if (!item.guid || !item.title || !item.link) continue;
 
-      const existing = await Article.findOne({ external_guid: guid });
+      const existing = await Article.findOne({ external_guid: item.guid });
 
       const content = bodyFor(item, fullText);
       const plain = toPlainText(content);
 
       /**
-       * This feed almost never carries a picture, so fall back to the article
-       * page's og:image — but only when we still have nothing, so a story is
-       * fetched at most once and a re-import costs no extra requests.
+       * The API hands the photo over directly. Only the feed leaves us
+       * guessing, and then only for a story we have no picture for yet — so a
+       * page is fetched at most once per story, ever.
        */
-      let image = firstImage(item.contentEncoded) || firstImage(item.content) || null;
-      if (!image && (!existing || !existing.image_url)) {
+      let image = item.image;
+      if (!image && via === 'rss' && (!existing || !existing.image_url)) {
         image = await ogImage(item.link);
         if (image) photosFetched += 1;
         await sleep(OG_LOOKUP_GAP_MS);
@@ -140,11 +310,12 @@ async function importNews({ limit = 30 } = {}) {
         category_id: category._id,
         author_id: author._id,
         status: 'published',
-        published_at: item.isoDate ? new Date(item.isoDate) : new Date(),
+        published_at: item.publishedAt || new Date(),
         is_external: true,
+        is_full_text: Boolean(fullText && item.html),
         source_name: sourceName,
         source_url: item.link,
-        source_author: item.creator ? sanitizePlain(item.creator) : null,
+        source_author: item.author ? sanitizePlain(item.author) : null,
       };
 
       if (existing) {
@@ -159,12 +330,12 @@ async function importNews({ limit = 30 } = {}) {
           ...fields,
           image_url: image,
           slug: await uniqueSlug(Article, fields.title),
-          external_guid: guid,
+          external_guid: item.guid,
         });
         imported += 1;
       }
     } catch (error) {
-      // One malformed item must not abandon the rest of the feed.
+      // One malformed story must not abandon the rest of the newsroom.
       failed += 1;
       // eslint-disable-next-line no-console
       console.error(`[news] Skipped "${item?.title || 'untitled'}": ${error.message}`);
@@ -173,7 +344,8 @@ async function importNews({ limit = 30 } = {}) {
 
   return {
     skipped: false,
-    source: feed.title || sourceName,
+    source: feedTitle || sourceName,
+    via,
     seen: items.length,
     imported,
     updated,
@@ -183,4 +355,11 @@ async function importNews({ limit = 30 } = {}) {
   };
 }
 
-module.exports = { importNews, CATEGORY_MAP, FALLBACK_CATEGORY };
+module.exports = {
+  importNews,
+  CATEGORY_MAP,
+  FALLBACK_CATEGORY,
+  mapCategory,
+  stripSyndicationTrailer,
+  fromFeedItem,
+};

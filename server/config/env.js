@@ -117,7 +117,40 @@ const config = {
   news: {
     feedUrl: process.env.NEWS_FEED_URL || '',
     sourceName: process.env.NEWS_SOURCE_NAME || 'Greek City Times',
+
+    /**
+     * Storing the whole article body rather than a headline, a photo and a
+     * link. Both the feed and the API hand the body over; that is not a
+     * licence to republish it. Turn this on only once the publisher has
+     * agreed in writing, and settle the photographs separately — a newsroom
+     * can license an agency picture for its own site and not be able to pass
+     * that on.
+     */
     fullText: toBool(process.env.NEWS_FULL_TEXT, false),
+
+    /**
+     * The WordPress API is preferred over the RSS feed: real photo URLs, the
+     * sections a story was filed under, the author, and pages going back
+     * years instead of the latest fifteen. Left blank it is derived from the
+     * feed's own host. Set NEWS_USE_API=false to pin the site to RSS.
+     */
+    apiUrl: process.env.NEWS_API_URL || '',
+    useApi: toBool(process.env.NEWS_USE_API, true),
+
+    /**
+     * Which of the publisher's sections to take, by their category id. Empty
+     * means all of them, which for Greek City Times means a great deal of
+     * wire copy about places this audience did not tune in for. Ids come from
+     * `npm run news:categories`.
+     */
+    categoryIds: (process.env.NEWS_CATEGORY_IDS || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
+
+    /** Stories per page, and how many pages. One page is a routine refresh. */
+    perPage: toInt(process.env.NEWS_IMPORT_LIMIT, 30),
+    pages: toInt(process.env.NEWS_IMPORT_PAGES, 1),
   },
 
   /* --- The show -------------------------------------------------------------

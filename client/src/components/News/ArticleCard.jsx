@@ -103,9 +103,17 @@ export default function ArticleCard({ article, variant = 'default' }) {
   );
 }
 
-/** A story we imported and are only allowed to summarise. */
+/**
+ * A story we imported and hold only a teaser of.
+ *
+ * Not the same question as "did we import it". Once the publisher has given
+ * permission and the whole article is stored, an imported story opens here
+ * like any other — with their credit and a link to the original on it. It is
+ * only the teaser that has to send the reader away, because a page here would
+ * show them two paragraphs and a dead end.
+ */
 function isExternal(article) {
-  return Boolean(article.is_external && article.source_url);
+  return Boolean(article.is_external && article.source_url && !article.is_full_text);
 }
 
 /**

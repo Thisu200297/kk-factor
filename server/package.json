@@ -18,7 +18,8 @@
     "test:watch": "cross-env NODE_ENV=test jest --runInBand --watch",
     "test:coverage": "cross-env NODE_ENV=test jest --runInBand --coverage --forceExit",
     "build": "npm install --include=dev --prefix ../client && npm run build --prefix ../client",
-    "db:partners": "node scripts/seedPartners.js"
+    "db:partners": "node scripts/seedPartners.js",
+    "news:categories": "node scripts/newsCategories.js"
   },
   "config": {
     "mongodbMemoryServer": {

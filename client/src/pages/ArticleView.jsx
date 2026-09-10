@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ArticleCard from '../components/News/ArticleCard';
 import RadioWidget from '../components/RadioPlayer/RadioWidget';
@@ -22,6 +22,24 @@ export default function ArticleView() {
 
   useDocumentTitle(article?.title);
 
+  /**
+   * Republished with permission is still republished: two copies of the same
+   * article exist on the web, and without a canonical the search engines have
+   * to guess which is the original. Pointing at the publisher is both the
+   * honest answer and the one that keeps their ranking intact — it is a large
+   * part of what a newsroom is agreeing to when it says yes.
+   */
+  useEffect(() => {
+    const canonical = article?.is_external ? article.source_url : null;
+    if (!canonical) return undefined;
+
+    const tag = document.createElement('link');
+    tag.rel = 'canonical';
+    tag.href = canonical;
+    document.head.appendChild(tag);
+    return () => tag.remove();
+  }, [article?.is_external, article?.source_url]);
+
   if (loading) return <PageLoader label="Loading the story…" />;
 
   if (error || !article) {
@@ -39,6 +57,9 @@ export default function ArticleView() {
   }
 
   const image = mediaUrl(article.image_url);
+  const byline = article.is_external
+    ? article.source_author || article.source_name || 'Greek City Times'
+    : article.author?.name || 'KK Factor newsroom';
 
   return (
     <div className="container-page py-6 md:py-10">
@@ -80,11 +101,16 @@ export default function ArticleView() {
             )}
 
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-line py-4 text-sm text-on-surface-variant">
+              {/*
+                An imported story is bylined to the journalist who wrote it and
+                the newsroom that published it — never to the admin account
+                that happens to own the record here.
+              */}
               <span className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-high text-xs font-semibold text-primary">
-                  {(article.author?.name || '?').charAt(0).toUpperCase()}
+                  {byline.charAt(0).toUpperCase()}
                 </span>
-                {article.author?.name || 'KK Factor newsroom'}
+                {byline}
               </span>
               <span aria-hidden="true">·</span>
               <time dateTime={article.published_at}>{formatDate(article.published_at)}</time>
@@ -96,6 +122,8 @@ export default function ArticleView() {
               </span>
             </div>
           </header>
+
+          {article.is_external && <SourceCredit article={article} />}
 
           {image && (
             <figure className="mb-8">
@@ -113,6 +141,26 @@ export default function ArticleView() {
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
 
+          {article.is_external && (
+            <footer className="mt-8 rounded-panel border border-line bg-surface-container-low p-5">
+              <p className="text-sm text-on-surface-variant">
+                This story was written and published by{' '}
+                <strong className="text-on-surface">{article.source_name}</strong>
+                {article.source_author && <> · {article.source_author}</>}. It appears here with
+                their permission.
+              </p>
+              <a
+                href={article.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary mt-4"
+              >
+                Read it on {hostOf(article.source_url) || article.source_name}
+                <Icon name="open_in_new" size={16} />
+              </a>
+            </footer>
+          )}
+
           {related.length > 0 && (
             <section className="mt-14 border-t border-line pt-8">
               <h2 className="mb-5 text-headline-md font-bold">Related stories</h2>
@@ -129,6 +177,42 @@ export default function ArticleView() {
           <RadioWidget />
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** The domain, for a link that says where it is going. */
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Who wrote this, shown before the article rather than after it.
+ *
+ * A reader who has scrolled past the headline of a republished story should
+ * not have to reach the bottom to find out it is not ours.
+ */
+function SourceCredit({ article }) {
+  return (
+    <div className="mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-panel border border-primary/25 bg-primary-soft/40 px-4 py-3">
+      <Icon name="newspaper" size={18} className="text-primary" />
+      <p className="text-sm text-on-surface">
+        Originally published by <strong>{article.source_name}</strong>
+        {article.source_author && <> · {article.source_author}</>}
+      </p>
+      <a
+        href={article.source_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+      >
+        View the original
+        <Icon name="open_in_new" size={14} />
+      </a>
     </div>
   );
 }

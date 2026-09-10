@@ -45,6 +45,16 @@ const articleSchema = new mongoose.Schema(
      * publisher instead of opening a page here.
      * --------------------------------------------------------------------- */
     is_external: { type: Boolean, default: false, index: true },
+    /**
+     * Whether we hold the whole article or only a teaser of it.
+     *
+     * This is what the client reads to decide where a headline leads. With
+     * only an excerpt, sending a reader to a page here would show them two
+     * paragraphs and a dead end, so the card opens the publisher's site.
+     * With the publisher's written permission and NEWS_FULL_TEXT on, we hold
+     * the article, and it opens here with the credit and the original link.
+     */
+    is_full_text: { type: Boolean, default: false },
     source_name: { type: String, default: null, trim: true, maxlength: 120 },
     /** Canonical link back to the publisher. Required reading for the reader. */
     source_url: { type: String, default: null, maxlength: 500 },

@@ -103,7 +103,8 @@ the repository, so your database password is **not** uploaded to GitHub.
 | `CLOUDINARY_URL` | the `cloudinary://...` string from Step 2 |
 | `NEWS_FEED_URL` | `https://greekcitytimes.com/feed/` |
 | `NEWS_SOURCE_NAME` | `Greek City Times` |
-| `NEWS_FULL_TEXT` | `false` |
+| `NEWS_FULL_TEXT` | `false` — see below before changing it |
+| `NEWS_CATEGORY_IDS` | optional; leave unset to take every section they publish |
 | `YOUTUBE_CHANNEL_ID` | `UC2g-gkU4Hwc3tGd3hkv5E1Q` |
 | `IMPORT_INTERVAL_MINUTES` | `30` |
 | `PUBLIC_SITE_URL` | your Render address, once you have it (Step 5) |
@@ -190,10 +191,26 @@ making before she sends the link to sponsors.
 from the dashboard disappears the next time the service restarts. The logos
 that shipped with the project are unaffected.
 
-**The news is headlines and links, not articles.** Until Greek City Times give
-written permission, the site shows their headline, photo and a two-line summary
-and sends the reader to their site. If they agree in writing, set
-`NEWS_FULL_TEXT` to `true` in Render and redeploy — no code change.
+**The news is headlines and links until the publisher says otherwise.** By
+default the site shows Greek City Times' headline, photo and a two-line summary
+and sends the reader to them. With their written permission, set
+`NEWS_FULL_TEXT=true` in Render — no code change and no redeploy needed beyond
+the restart Render does for you. Imported stories then open on this site, each
+carrying the journalist's byline, the credit, and a canonical link back.
+
+Two things to settle in the same email as the permission:
+
+- **The photographs.** Newsrooms license agency pictures for their own site
+  and often cannot pass that on. Permission for the words is not permission
+  for the images.
+- **Which sections.** They publish about a hundred, and most of the volume is
+  wire copy about places this audience did not tune in for. `npm run
+  news:categories` lists them with counts and suggests a set; put the ids in
+  `NEWS_CATEGORY_IDS`.
+
+To pull in their back catalogue once, set `NEWS_IMPORT_PAGES` to 5 or 10, let
+one refresh run, then put it back to `1`. Thirty stories a page, and it is
+idempotent, so nothing is duplicated if you run it twice.
 
 ## If something goes wrong
 
