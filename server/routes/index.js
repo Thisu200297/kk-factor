@@ -13,6 +13,7 @@ const episodeRoutes = require('./episodeRoutes');
 const showRoutes = require('./showRoutes');
 const importRoutes = require('./importRoutes');
 const mediaRoutes = require('./mediaRoutes');
+const membershipRoutes = require('./membershipRoutes');
 const statsController = require('../controllers/statsController');
 const articleController = require('../controllers/articleController');
 const validate = require('../middleware/validate');
@@ -41,6 +42,7 @@ router.use('/episodes', episodeRoutes);
 router.use('/show', showRoutes);
 router.use('/import', importRoutes);
 router.use('/media', mediaRoutes);
+router.use('/membership', membershipRoutes);
 
 // Top-level search, per the API contract in the brief.
 router.get('/search', optionalAuth, searchRules, validate, articleController.searchArticles);

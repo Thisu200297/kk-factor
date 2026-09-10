@@ -11,6 +11,9 @@ const wpApi = require('../services/wpApi');
 const {
   mapCategory,
   stripSyndicationTrailer,
+  stripPublisherChrome,
+  makeExcerpt,
+  bodyFor,
   fromFeedItem,
   CATEGORY_MAP,
   FALLBACK_CATEGORY,
@@ -241,5 +244,129 @@ describe('normalise', () => {
 
   it('falls back to the post id when a site sends no guid', () => {
     expect(wpApi.normalise({ id: 42 }).guid).toBe('?p=42');
+  });
+});
+
+describe('stripPublisherChrome', () => {
+  it('removes the ad label the sanitiser leaves stranded in the prose', () => {
+    // The sanitiser drops the consent-gated <script> and keeps the label, so
+    // the word "Advertising1" ends up reading as part of the article.
+    const html =
+      '<p>Real reporting.</p>' +
+      '<div class="greek-2domain-0426 greek-2entity-placement" id="greek-233102">' +
+      '<div class="greek-2adlabel">Advertising1</div>' +
+      '</div>' +
+      '<p>More reporting.</p>';
+
+    const out = stripPublisherChrome(html);
+    expect(out).not.toMatch(/Advertising/i);
+    expect(out).toContain('Real reporting.');
+    expect(out).toContain('More reporting.');
+  });
+
+  it('removes the wrapper it emptied, rather than leaving a hollow div', () => {
+    const out = stripPublisherChrome(
+      '<div class="x entity-placement"><div class="adlabel">Advertising2</div></div>'
+    );
+    expect(out.trim()).toBe('');
+  });
+
+  it('removes the blocks publishers staple to every article', () => {
+    const out = stripPublisherChrome(
+      '<p>Story.</p><div class="greek-2after-post">Read more from us</div>'
+    );
+    expect(out).toContain('Story.');
+    expect(out).not.toMatch(/Read more from us/);
+  });
+
+  it('leaves an article that has none of it exactly as it was', () => {
+    const html = '<p>Just the story.</p><h2>A heading</h2><p>And more.</p>';
+    expect(stripPublisherChrome(html)).toBe(html);
+  });
+
+  it('never eats the article when a block is not closed as expected', () => {
+    // Non-greedy, so an unclosed wrapper costs a fragment of markup rather
+    // than everything after it.
+    const html = '<div class="adlabel">Advertising1<p>The whole article follows.</p>';
+    expect(stripPublisherChrome(html)).toContain('The whole article follows.');
+  });
+
+  it('survives null and undefined', () => {
+    expect(stripPublisherChrome(null)).toBe('');
+    expect(stripPublisherChrome(undefined)).toBe('');
+  });
+});
+
+describe('makeExcerpt', () => {
+  it('leaves a short summary alone', () => {
+    expect(makeExcerpt('Short enough.')).toBe('Short enough.');
+  });
+
+  it('ends on a word rather than in the middle of one', () => {
+    const long = `${'word '.repeat(80)}finalword`;
+    const out = makeExcerpt(long, 100);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out.slice(0, -1)).not.toMatch(/\s$/);
+    expect(out.replace('…', '').split(' ').pop()).toBe('word');
+  });
+
+  it('does not throw away most of the summary chasing a space', () => {
+    // One enormous word: backing up to the last space would leave almost
+    // nothing, so it is cut where it is.
+    const out = makeExcerpt(`a ${'x'.repeat(400)}`, 100);
+    expect(out.length).toBeGreaterThan(90);
+  });
+
+  it('does not leave a dangling comma or dash before the ellipsis', () => {
+    const out = makeExcerpt(`${'word '.repeat(20)}something, more words here`, 105);
+    expect(out).not.toMatch(/[,;:\-]…$/);
+  });
+
+  it('survives null and undefined', () => {
+    expect(makeExcerpt(null)).toBe('');
+    expect(makeExcerpt(undefined)).toBe('');
+  });
+});
+
+describe('bodyFor', () => {
+  // The helpers above were right and the article still went out with the ad
+  // label in it, because the one line that calls them had not been changed.
+  // Testing the helper alone did not catch that. Testing the seam does.
+  const AD =
+    '<div class="greek-2domain-0426 greek-2entity-placement">' +
+    '<div class="greek-2adlabel">Advertising1</div>' +
+    '</div>';
+
+  it('keeps the publisher\'s furniture out of a full article', () => {
+    const out = bodyFor(
+      { html: `<p>First half.</p>${AD}<h2>A heading</h2><p>Second half.</p>` },
+      true
+    );
+    expect(out).not.toMatch(/Advertis/i);
+    expect(out).toContain('First half.');
+    expect(out).toContain('Second half.');
+    expect(out).toContain('A heading');
+  });
+
+  it('keeps it out of an excerpt too', () => {
+    const out = bodyFor({ excerptHtml: `<p>A teaser.</p>${AD}` }, false);
+    expect(out).not.toMatch(/Advertis/i);
+    expect(out).toContain('A teaser.');
+  });
+
+  it('stores the whole article only when permission has been given', () => {
+    const item = {
+      html: '<p>The whole article, at length.</p>',
+      excerptHtml: '<p>Two lines.</p>',
+    };
+    expect(bodyFor(item, true)).toContain('The whole article');
+    expect(bodyFor(item, false)).toContain('Two lines.');
+    expect(bodyFor(item, false)).not.toContain('The whole article');
+  });
+
+  it('strips script and iframe whichever mode it is in', () => {
+    const nasty = '<p>Text.</p><script>alert(1)</script><iframe src="https://x"></iframe>';
+    expect(bodyFor({ html: nasty }, true)).not.toMatch(/<script|<iframe/i);
+    expect(bodyFor({ excerptHtml: nasty }, false)).not.toMatch(/<script|<iframe/i);
   });
 });

@@ -21,7 +21,7 @@ never a third-party cookie (which Safari blocks by default).
 | **The weekly slot** | Tuesdays 7.30–9.30pm, counted down on the site and offered as a calendar entry. Edited from the dashboard, day and time and zone. |
 | **Music** | Her own playlist, uploaded as files, with a player that survives navigation. |
 | **Gallery** | Photos and video from events. Video is a YouTube link rather than a file. |
-| **Membership** | Normal and Premium listeners. An episode can be marked for members; the lock is enforced on the server. |
+| **Membership** | Free and Premium, shown as two cards the client edits from the dashboard. An episode can be marked for members and the lock is enforced on the server — nothing takes payment, and the Premium card says so. |
 
 ---
 
@@ -156,6 +156,20 @@ fallback, so the strip across the top of the site can never come up empty.
 Anything an editor uploads goes to Cloudinary under an absolute URL and never
 reaches that handler.
 
+**The membership cards do not take money, and say so.** The client wanted the
+levels visible before there is anything to sell. So Premium reads "Coming
+soon", carries a badge, is followed by a line saying no payment is taken, and
+its button opens an email rather than a checkout. A page that looks like it
+takes payment and does not is worse than no page. The wording lives in a
+setting because what Premium includes is still being decided, and deciding it
+should not need a deploy.
+
+**Imported articles are stripped of the publisher's furniture.** A newsroom's
+article body is not only the article: Greek City Times inject ad slots holding
+a consent-gated script and a small label reading "Advertising1". The sanitiser
+drops the script and leaves the label sitting in the prose, where it reads as
+though we wrote it.
+
 **Premium is enforced on the server.** A locked episode is still listed — being
 able to see that something exists is the point of a members tier — but the video
 id is stripped from the response before it leaves the API.
@@ -168,13 +182,14 @@ id is stripped from the response before it leaves the API.
 npm test
 ```
 
-94 tests, no database, under two seconds. They cover the places this project has
+118 tests, no database, under two seconds. They cover the places this project has
 actually had bugs: slug collisions, HTML entities in imported headlines, the six
 shapes a YouTube link arrives in, pagination clamping, the fact that a refresh
 token can never be presented as an access token, the site being allowed to call
 its own API, the syndication trailer that — with the obvious regex — ate every
-article containing the words "appeared first on", and both nights a year when
-Melbourne's clocks move.
+article containing the words "appeared first on", both nights a year when
+Melbourne's clocks move, and the seam between a helper and its one caller —
+which is where the ad-label strip was written correctly and then not called.
 
 ---
 

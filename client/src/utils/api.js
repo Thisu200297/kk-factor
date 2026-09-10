@@ -261,6 +261,11 @@ export const showApi = {
   setSchedule: (payload) => unwrap(api.put('/show/schedule', payload)),
 };
 
+export const membershipApi = {
+  get: () => unwrap(api.get('/membership')),
+  save: (payload) => unwrap(api.put('/membership', payload)),
+};
+
 export const importApi = {
   run: () => unwrap(api.post('/import/run')),
   status: () => unwrap(api.get('/import/status')),

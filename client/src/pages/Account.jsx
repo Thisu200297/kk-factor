@@ -3,6 +3,7 @@ import Icon from '../components/common/Icon';
 import { Spinner } from '../components/common/Loader';
 import { InlineError } from '../components/common/States';
 import { useToast } from '../components/common/Toast';
+import Plans from '../components/Membership/Plans';
 import { useAuth } from '../hooks/useAuth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { authApi, setAccessToken } from '../utils/api';
@@ -164,6 +165,8 @@ export default function Account() {
           </p>
         </form>
       </div>
+
+      <Plans className="mt-14 border-t border-line pt-12" />
     </div>
   );
 }

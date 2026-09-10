@@ -9,6 +9,7 @@ import PlaylistsManager from '../components/Admin/PlaylistsManager';
 import ShowManager from '../components/Admin/ShowManager';
 import PartnersManager from '../components/Admin/PartnersManager';
 import GalleryManager from '../components/Admin/GalleryManager';
+import MembershipManager from '../components/Admin/MembershipManager';
 import UserManager from '../components/Admin/UserManager';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../hooks/useAuth';
@@ -23,6 +24,7 @@ const SECTIONS = {
   gallery: GalleryManager,
   music: MusicLibrary,
   playlists: PlaylistsManager,
+  membership: MembershipManager,
   users: UserManager,
 };
 

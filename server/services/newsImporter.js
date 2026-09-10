@@ -162,11 +162,69 @@ function stripSyndicationTrailer(html) {
   return source.slice(0, lastParagraph.index);
 }
 
+/**
+ * The publisher's own furniture, removed before the article is stored.
+ *
+ * A newsroom's article body is not only the article. Greek City Times inject
+ * ad slots into theirs: a wrapper holding a consent-gated <script> and a
+ * little label reading "Advertising1". The sanitiser drops the script, as it
+ * should — and leaves the label sitting in the middle of the prose, where it
+ * reads as though we wrote it.
+ *
+ * Everything here is non-greedy and stops at the first closing tag, so the
+ * worst case is a fragment of markup left behind rather than an article
+ * silently truncated. Wrong in the harmless direction.
+ */
+const PUBLISHER_CHROME = [
+  // The ad label itself.
+  /<div[^>]*class="[^"]*adlabel[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+  // Blocks a publisher appends to every article: related posts, newsletter
+  // sign-ups, "read more from us".
+  /<div[^>]*class="[^"]*(?:after-post|related-post|newsletter|subscribe-box)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+  // A bare "Advertisement" paragraph, which some themes use instead.
+  /<p[^>]*>\s*Advertisement\s*\d*\s*<\/p>/gi,
+];
+
+/** Elements the sanitiser leaves behind once their contents have gone. */
+const EMPTY_ELEMENT = /<(div|p|span|figure)\b[^>]*>\s*<\/\1>/gi;
+
+function stripPublisherChrome(html) {
+  let out = String(html || '');
+  for (const pattern of PUBLISHER_CHROME) out = out.replace(pattern, '');
+
+  // Twice, because removing an inner element can empty its parent.
+  out = out.replace(EMPTY_ELEMENT, '').replace(EMPTY_ELEMENT, '');
+  return out;
+}
+
+/**
+ * A summary that ends on a word.
+ *
+ * Slicing to a fixed length lands mid-word about five times in six, and
+ * "...was initially treated at a pr…" is the sort of thing a reader notices
+ * before they notice the headline. Backing up to the last space fixes it,
+ * unless that would throw away most of the summary.
+ */
+function makeExcerpt(plain, max = 300) {
+  const text = String(plain || '').trim();
+  if (text.length <= max) return text;
+
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  const kept = lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut;
+
+  return `${kept.replace(/[\s,;:.\u2013\u2014-]+$/, '')}…`;
+}
+
 /** The article body we are willing to store, given the permission we have. */
 function bodyFor(item, fullText) {
-  if (fullText && item.html) return sanitizeRichText(item.html);
-  const excerpt = stripSyndicationTrailer(item.excerptHtml || item.html || '');
-  return sanitizeRichText(excerpt || item.excerptHtml || '');
+  if (fullText && item.html) {
+    return sanitizeRichText(stripPublisherChrome(item.html));
+  }
+
+  const source = item.excerptHtml || item.html || '';
+  const trimmed = stripSyndicationTrailer(source);
+  return sanitizeRichText(stripPublisherChrome(trimmed || source));
 }
 
 /* ------------------------------------------------------------------------ *
@@ -306,7 +364,7 @@ async function importNews({ limit, pages, categoryIds } = {}) {
       const fields = {
         title: sanitizePlain(item.title).slice(0, 255),
         content,
-        excerpt: plain.slice(0, 300) + (plain.length > 300 ? '…' : ''),
+        excerpt: makeExcerpt(plain),
         category_id: category._id,
         author_id: author._id,
         status: 'published',
@@ -361,5 +419,8 @@ module.exports = {
   FALLBACK_CATEGORY,
   mapCategory,
   stripSyndicationTrailer,
+  stripPublisherChrome,
+  makeExcerpt,
+  bodyFor,
   fromFeedItem,
 };

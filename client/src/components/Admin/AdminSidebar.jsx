@@ -10,6 +10,7 @@ export const ADMIN_SECTIONS = [
   { id: 'gallery', label: 'Gallery', icon: 'image' },
   { id: 'music', label: 'Music library', icon: 'library_music' },
   { id: 'playlists', label: 'Playlists', icon: 'queue_music' },
+  { id: 'membership', label: 'Membership', icon: 'workspace_premium' },
   { id: 'users', label: 'Users', icon: 'group' },
 ];
 
